@@ -4,9 +4,6 @@ const mysql = require("mysql2");
 require("dotenv").config();
 
 //DATA
-const department_names = [];
-const role_names = [];
-const employee_names = [];
 
 //Inquirer List
 menuList = [
@@ -23,78 +20,6 @@ menuList = [
       "Add Department",
     ],
     name: "mainChoice",
-  },
-];
-
-//Add department list
-departmentList = [
-  {
-    type: "input",
-    message: "What is the name of the department?",
-    name: "departmentName",
-  },
-];
-
-//Add Role list
-roleList = [
-  {
-    type: "input",
-    message: "What is the name of the role?",
-    name: "roleName",
-  },
-  {
-    type: "input",
-    message: "What is the salary of the role?",
-    name: "salary",
-  },
-  {
-    type: "list",
-    message: "Which department does the role belong to?",
-    choices: department_names,
-    name: "departmentChoice",
-  },
-];
-
-//Employee list
-employeeList = [
-  {
-    type: "input",
-    message: "What is the employee's first name?",
-    name: "firstName",
-  },
-  {
-    type: "input",
-    message: "What is the employee's last name?",
-    name: "lastName",
-  },
-  {
-    type: "list",
-    message: "What is the employee's role?",
-    choices: role_names,
-    name: "roleChoice",
-  },
-
-  {
-    type: "list",
-    message: "Who is the employee's manager?",
-    choices: employee_names,
-    name: "managerChoice",
-  },
-];
-
-//Update Employee Role List
-const updateEmployeeList = [
-  {
-    type: "list",
-    message: "Which employee's role would you want to update?",
-    choices: employee_names,
-    name: "employeeUpdateChoice",
-  },
-  {
-    type: "list",
-    message: "Which role do you want to assign the selected employee?",
-    choices: role_names,
-    name: "roleUpdateChoice",
   },
 ];
 
@@ -175,163 +100,251 @@ function viewAllEmployees() {
   );
 }
 
-//helper function to populate global department list
-function helperDepartmentList() {
-  db.query("SELECT * FROM department", function (err, results) {
-    if (err) {
-      console.log(err);
-    } else {
-      for (let i = 0; i < results.length; i++) {
-        department_names.push(results[i].name);
-      }
-    }
-  });
-}
-
-//helper function to populate global role list
-function helperRoleList() {
-  db.query("SELECT title FROM role", function (err, results) {
-    if (err) {
-      console.log(err);
-    } else {
-      for (let i = 0; i < results.length; i++) {
-        role_names.push(results[i].title);
-      }
-    }
-  });
-}
-
-//helper function to populate global employee list
-function helperEmployeeList() {
-  db.query("SELECT * FROM employee", function (err, results) {
-    if (err) {
-      console.log(err);
-    } else {
-      employee_names.push("None");
-      for (let i = 0; i < results.length; i++) {
-        const currentName = results[i].first_name + " " + results[i].last_name;
-        employee_names.push(currentName);
-      }
-    }
-  });
-}
-
 //Function add department
 function addDepartment() {
-  inquirer.prompt(departmentList).then((answers) => {
-    db.query(
-      "INSERT INTO department (name) VALUES (?)",
-      answers.departmentName,
-      function (err, results) {
-        if (err) {
-          console.log(err);
+  inquirer
+    .prompt([
+      {
+        type: "input",
+        message: "What is the name of the department?",
+        name: "departmentName",
+      },
+    ])
+    .then((answers) => {
+      db.query(
+        "INSERT INTO department (name) VALUES (?)",
+        answers.departmentName,
+        function (err, results) {
+          if (err) {
+            console.log(err);
+          }
+          console.log("Success!");
+          showMainMenu();
         }
-        console.log("Success!");
-        showMainMenu();
-      }
-    );
-  });
+      );
+    });
 }
 
 //Function add Role
 function addRole() {
   //Get the current departments
-  helperDepartmentList();
-  inquirer.prompt(roleList).then((answers) => {
-    let departmentID = 0;
-    for (let i = 0; i < department_names.length; i++) {
-      if (department_names[i] === answers.departmentChoice) {
-        departmentID = i + 1;
+  db.query("SELECT * FROM department", function (err, departmentResults) {
+    if (err) {
+      console.log(err);
+    } else {
+      const departmentResultsList = [];
+      for (let i = 0; i < departmentResults.length; i++) {
+        departmentResultsList.push(departmentResults[i].name);
       }
+
+      inquirer
+        .prompt([
+          {
+            type: "input",
+            message: "What is the name of the role?",
+            name: "roleName",
+          },
+          {
+            type: "input",
+            message: "What is the salary of the role?",
+            name: "salary",
+          },
+          {
+            type: "list",
+            message: "Which department does the role belong to?",
+            choices: departmentResults,
+            name: "departmentChoice",
+          },
+        ])
+        .then((answers) => {
+          let departmentID = 0;
+          for (let i = 0; i < departmentResults.length; i++) {
+            if (departmentResults[i].name === answers.departmentChoice) {
+              departmentID = i + 1;
+            }
+          }
+          db.query(
+            "INSERT INTO role (title, salary, department_id) VALUES (?, ?, ?)",
+            [answers.roleName, answers.salary, departmentID],
+            function (err, results) {
+              if (err) {
+                console.log(err);
+              }
+              console.log("Success!");
+              showMainMenu();
+            }
+          );
+        });
     }
-    db.query(
-      "INSERT INTO role (title, salary, department_id) VALUES (?, ?, ?)",
-      [answers.roleName, answers.salary, departmentID],
-      function (err, results) {
-        if (err) {
-          console.log(err);
-        }
-        console.log("Success!");
-        showMainMenu();
-      }
-    );
   });
 }
 
 //Function add Role
 function addEmployee() {
-  //Get the current role
-  helperRoleList();
-  //Get the employee manager options
-  helperEmployeeList();
-
-  let roleID = 0;
-  let managerID = 0;
-  inquirer.prompt(employeeList).then((answers) => {
-    for (let i = 0; i < role_names.length; i++) {
-      if (role_names[i] === answers.roleChoice) {
-        roleID = i + 1;
-      }
-    }
-
-    if (answers.managerChoice === "None") {
-      managerID = null;
+  db.query("SELECT * FROM role", function (err, roleResults) {
+    if (err) {
+      console.log(err);
     } else {
-      for (let i = 0; i < employee_names.length; i++) {
-        if (employee_names[i] === answers.managerChoice) {
-          managerID = i;
-        }
+      const roleResultList = [];
+      for (let i = 0; i < roleResults.length; i++) {
+        roleResultList.push(roleResults[i].title);
       }
-    }
 
-    db.query(
-      "INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?, ?, ?, ?)",
-      [answers.firstName, answers.lastName, roleID, managerID],
-      function (err, results) {
+      db.query("SELECT * FROM employee", function (err, employeeResults) {
         if (err) {
           console.log(err);
+        } else {
+          const employeeResultList = [];
+          employeeResultList.push("None");
+          for (let i = 0; i < employeeResults.length; i++) {
+            const currentName =
+              employeeResults[i].first_name +
+              " " +
+              employeeResults[i].last_name;
+            employeeResultList.push(currentName);
+          }
+
+          let roleID = 0;
+          let managerID = 0;
+          inquirer
+            .prompt([
+              {
+                type: "input",
+                message: "What is the employee's first name?",
+                name: "firstName",
+              },
+              {
+                type: "input",
+                message: "What is the employee's last name?",
+                name: "lastName",
+              },
+              {
+                type: "list",
+                message: "What is the employee's role?",
+                choices: roleResultList,
+                name: "roleChoice",
+              },
+
+              {
+                type: "list",
+                message: "Who is the employee's manager?",
+                choices: employeeResultList,
+                name: "managerChoice",
+              },
+            ])
+            .then((answers) => {
+              for (let i = 0; i < roleResults.length; i++) {
+                if (roleResults[i].title === answers.roleChoice) {
+                  roleID = i + 1;
+                }
+              }
+
+              if (answers.managerChoice === "None") {
+                managerID = null;
+              } else {
+                for (let i = 0; i < employeeResults.length; i++) {
+                  const currentName =
+                    employeeResults[i].first_name +
+                    " " +
+                    employeeResults[i].last_name;
+                  if (currentName === answers.managerChoice) {
+                    managerID = i + 1;
+                  }
+                }
+              }
+
+              db.query(
+                "INSERT INTO employee (first_name, last_name, role_id, manager_id) VALUES (?, ?, ?, ?)",
+                [answers.firstName, answers.lastName, roleID, managerID],
+                function (err, results) {
+                  if (err) {
+                    console.log(err);
+                  }
+                  console.log("Success!");
+                  showMainMenu();
+                }
+              );
+            });
         }
-        console.log("Success!");
-        showMainMenu();
-      }
-    );
+      });
+    }
   });
 }
 
 //Function to update employees role
 function updateEmployeeRole() {
-  helperEmployeeList();
-  // helperRoleList();
-  employee_names.splice(0, 1);
-
-  let roleID = 0;
-  let employeeID = 0;
-
-  inquirer.prompt(updateEmployeeList).then((answers) => {
-    //Get the index of role
-    for (let i = 0; i < role_names.length; i++) {
-      if (role_names[i] === answers.roleChoice) {
-        roleID = i + 1;
+  db.query("SELECT * FROM role", function (err, roleResults) {
+    if (err) {
+      console.log(err);
+    } else {
+      const roleResultList = [];
+      for (let i = 0; i < roleResults.length; i++) {
+        roleResultList.push(roleResults[i].title);
       }
-    }
 
-    for (let i = 0; i < employee_names.length; i++) {
-      if (employee_names[i] === answers.managerChoice) {
-        employeeID = i + 1;
-      }
-    }
-
-    db.query(
-      "UPDATE employee SET role_id = ? WHERE employee.id = ?",
-      [roleID, employeeID],
-      function (err, results) {
+      db.query("SELECT * FROM employee", function (err, employeeResults) {
         if (err) {
           console.log(err);
+        } else {
+          const employeeResultList = [];
+          for (let i = 0; i < employeeResults.length; i++) {
+            const currentName =
+              employeeResults[i].first_name +
+              " " +
+              employeeResults[i].last_name;
+            employeeResultList.push(currentName);
+          }
+
+          let roleID = 0;
+          let employeeID = 0;
+          inquirer
+            .prompt([
+              {
+                type: "list",
+                message: "Which employee's role would you want to update?",
+                choices: employeeResultList,
+                name: "employeeUpdateChoice",
+              },
+              {
+                type: "list",
+                message:
+                  "Which role do you want to assign the selected employee?",
+                choices: roleResultList,
+                name: "roleUpdateChoice",
+              },
+            ])
+            .then((answers) => {
+              for (let i = 0; i < roleResults.length; i++) {
+                if (roleResults[i].title === answers.roleUpdateChoice) {
+                  roleID = i + 1;
+                }
+              }
+
+              for (let i = 0; i < employeeResults.length; i++) {
+                const currentName =
+                  employeeResults[i].first_name +
+                  " " +
+                  employeeResults[i].last_name;
+                if (currentName === answers.employeeUpdateChoice) {
+                  employeeID = i + 1;
+                }
+              }
+
+              db.query(
+                "UPDATE employee SET role_id = ? WHERE employee.id = ?",
+                [roleID, employeeID],
+                function (err, results) {
+                  if (err) {
+                    console.log(err);
+                  }
+                  console.log("Success!");
+                  showMainMenu();
+                }
+              );
+            });
         }
-        console.log("Success!");
-        showMainMenu();
-      }
-    );
+      });
+    }
   });
 }
 
